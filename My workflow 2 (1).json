@@ -1,0 +1,905 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const snippet = item.json.snippet || \"\";\n  const body = item.json.text || \"\";\n  const subject = item.json.subject || \"\";\n  \n  // Get all available fields for debugging\n  const allFields = Object.keys(item.json);\n  \n  // Try multiple text sources - Gmail API has different field names\n  const textSources = [\n    item.json.snippet,\n    item.json.text,\n    item.json.bodyText,\n    item.json.payload?.body?.data,\n    item.json.payload?.parts?.[0]?.body?.data,\n    item.json.htmlBody,\n    item.json.textBody\n  ].filter(Boolean);\n  \n  // Combine all available text\n  const fullText = (snippet + \" \" + body + \" \" + subject + \" \" + textSources.join(\" \")).toLowerCase();\n  \n  // More comprehensive URL regex\n  const urlRegex = /(https?:\\/\\/(?:[-\\w.])+(?:[:\\d]+)?(?:\\/(?:[\\w\\/_.])*(?:\\?(?:[\\w&=%.])*)?(?:#(?:[\\w.])*)?)?)/gi;\n  const links = [];\n  let match;\n  while ((match = urlRegex.exec(fullText)) !== null) {\n    links.push(match[0]);\n  }\n  \n  // Also try to extract from original case text\n  const originalText = snippet + \" \" + body + \" \" + subject + \" \" + textSources.join(\" \");\n  const originalLinks = [];\n  while ((match = urlRegex.exec(originalText)) !== null) {\n    originalLinks.push(match[0]);\n  }\n  \n  // Combine all found links\n  const allLinks = [...new Set([...links, ...originalLinks])];\n  \n  // Check for job-related keywords\n  const jobKeywords = ['challenge', 'task', 'talent acquisition', 'hr', 'interview', 'shortlisted', 'assessment', 'coding test', 'technical round'];\n  const isJobRelated = jobKeywords.some(keyword => fullText.includes(keyword));\n  \n  // Check for meeting links with more domains\n  const meetingDomains = ['meet.google.com', 'zoom.us', 'teams.microsoft.com', 'webex.com', 'gotomeeting.com', 'skype.com'];\n  const meetingLinks = allLinks.filter(link => meetingDomains.some(domain => link.toLowerCase().includes(domain)));\n  const hasMeetingLink = meetingLinks.length > 0;\n  \n  // Check for interview specifically\n  const hasInterview = fullText.includes('interview');\n  \n  return {\n    json: {\n      ...item.json,\n      isJobRelated,\n      hasMeetingLink,\n      hasInterview,\n      links: allLinks,\n      meetingLinks,\n      // Debug info\n      debug: {\n        availableFields: allFields,\n        textSources: textSources.length,\n        fullTextLength: fullText.length,\n        originalTextLength: originalText.length,\n        linksFound: allLinks.length,\n        meetingLinksFound: meetingLinks.length\n      }\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1104,
+        -592
+      ],
+      "id": "77262aa4-e2ac-4895-bb43-c93800f82745",
+      "name": "Analyze Email Content"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "108012f2-5a8c-4b7b-aa59-a986dd2dc6a5",
+              "leftValue": "={{$json.isJobRelated}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -864,
+        -592
+      ],
+      "id": "e1f3e7c4-a2db-4ccf-bc48-153cd3038f97",
+      "name": "Is Job Related?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "17241fe6-b2ac-4530-849b-703a6eaef5dd",
+              "leftValue": "={{ $json.has_links }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        -736
+      ],
+      "id": "3b2e29c8-f866-4b8f-9b93-6f376947865a",
+      "name": "Has Meeting Link?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "17241fe6-b2ac-4530-849b-703a6eaef5dd",
+              "leftValue": "={{$json.hasInterview}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "id": "e1a34c3d-48ec-4e59-8de6-d52e2a6515c5",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "interview",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "ec378bc5-7b45-497d-8068-9fa51378ad6d",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "Interview",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "af71cda9-13c3-4146-a693-5c35392ca604",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "challenge",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "66f0635c-2c87-43d5-9fc1-80bda99f2525",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "Challenge",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "381bf073-1c6d-476c-ae96-629fec7d5acc",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "task",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "fe98434b-2511-41a6-baa6-b54dc8b7f1d2",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "hr",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "de247889-617f-4424-a93e-1e31fb0f95ff",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "HR",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "cf7e7485-6cd8-4657-a3df-024a60e0fbba",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "Task",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -640,
+        -448
+      ],
+      "id": "4b16d905-ef79-4829-bda4-3226779c9741",
+      "name": "Has Interview Keyword?"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "nadafamra@gmail.com",
+          "mode": "list",
+          "cachedResultName": "nadafamra@gmail.com"
+        },
+        "start": "={{ DateTime.fromFormat($json.date_found[0] + ' ' + $json.time_found[0], 'MMMM d, yyyy h:mm a z').toISO() }}",
+        "end": "={{ DateTime.fromFormat($json.date_found[0] + ' ' + $json.time_found[0], 'MMMM d, yyyy h:mm a z').plus({ hours: 1 }).toISO() }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        -752
+      ],
+      "id": "f157a3fb-0ddf-4068-baa1-dd222ed7b52b",
+      "name": "Create Calendar Event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "EZxnJ2Sd9oedu8V2",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ntfy.sh/amra_reminder",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Title",
+              "value": "Meeting Alert"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "=Hey Amra! 👋\n\nYou have a meet upcoming. Interesting!\n\nHere's the link: {{$('Has Meeting Link?').item.json.links_found[0]}}\n\nAnd here is the Google Calendar event link your assistant created: {{$json.htmlLink}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        512,
+        -752
+      ],
+      "id": "66a37934-e6f8-42a7-b093-33757528fc06",
+      "name": "Send Meeting Notification"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        -592
+      ],
+      "id": "1416677a-2c43-4b61-a5a2-cf8f9d01fda8",
+      "name": "Get a message2",
+      "webhookId": "dd966052-d9ec-47c0-8958-eb85a07f9d7d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "JbzIJrHiX6bOTgon",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "88e5c78a-2440-4de0-a2ce-70ae2b3ace14",
+              "name": "email_body",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        -736
+      ],
+      "id": "4e2fc222-78b0-4f00-964c-4307f01c3d8a",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get email body from previous node\nconst emailBody = $input.first().json.email_body;\n\n// Regular expression to find URLs\nconst urlRegex = /(https?:\\/\\/[^\\s]+)/g;\n\n// Find all links\nconst links = emailBody.match(urlRegex) || [];\n\n// Return results\nreturn [{\n  json: {\n    original_email: emailBody,\n    links_found: links,\n    link_count: links.length,\n    has_links: links.length > 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        -736
+      ],
+      "id": "a83e6e74-d8b0-4d1e-a98d-73900ae8d9a5",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "INBOX",
+            "CATEGORY_PERSONAL",
+            "UNREAD"
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1712,
+        -592
+      ],
+      "id": "88cc1e79-a34c-4a58-ade0-a5a25dd381e2",
+      "name": "nadafamra@gmail.com1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "JbzIJrHiX6bOTgon",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "INBOX",
+            "UNREAD",
+            "CATEGORY_PERSONAL"
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1712,
+        -768
+      ],
+      "id": "5aa215ff-5b28-4b1f-8c11-c8cdd4045b50",
+      "name": "amranadaf3@gmail.com1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "g007vIwuq1yBOeBu",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "labelIds": [
+            "CATEGORY_PERSONAL",
+            "UNREAD",
+            "INBOX"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1712,
+        -416
+      ],
+      "id": "1d06b5b8-b146-4f7b-bb4b-e24861b79753",
+      "name": "amranadaf@gmail.com1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "SMLWGj71VQtRv9Us",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get email body from previous node\nconst emailBody = $input.first().json.original_email;\n\n// Regular expression to find URLs\nconst date_regex = /\\b(January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2},?\\s+\\d{4}\\b/gi;\n\nconst time_regex= /\\b\\d{1,2}:\\d{2}\\s*[AP]M\\s+[A-Z]{3,4}\\b/gi;\n\n// Find date\nconst date = emailBody.match(date_regex) || [];\n\n//Find time\nconst time = emailBody.match(time_regex) || [];\n\n\n// Return results\nreturn [{\n  json: {\n    original_email: emailBody,\n    date_found: date,\n    time_found: time,\n    \n  }\n}];"
+      },
+      "id": "ea99bb23-5bd0-4854-90bc-08f6cf871ea4",
+      "name": "Extract Event Date & Time",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -752
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ntfy.sh/amra_reminder",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Title",
+              "value": "Interview Alert "
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "=Hey Amra! 🎯 \n\nYou have an interview notification! 📧\n\nGood luck! And don't forget to check your email for details. 💪",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -320,
+        -464
+      ],
+      "id": "962b29ff-36a1-4e94-b0f1-894262cd134a",
+      "name": "Send Interview Notification2"
+    },
+    {
+      "parameters": {
+        "content": "Final workflow",
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1824,
+        -800
+      ],
+      "typeVersion": 1,
+      "id": "5263ce4f-8f17-408b-b9aa-5d258ace040e",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a mail assistant. Analyze the following email content and decide the type of mail.\nFollow these rules strictly and ONLY output in JSON (no explanations, no extra text):\n\n1. If it is job-related and has interview confirmation mentioned → output:\n   {\n     \"interview\": \"present\"\n   }\n   - If it is job-related but has no interview confirmation → output nothing.\n\n2. If the mail is university admission-related (e.g., congratulations for a conditional/unconditional offer letter or admission), output:\n   {\n     \"uni_offer\": true\n   }\n\n3. For all other cases → output nothing (empty JSON: {}).\n\nNow analyze this email:\n\"{{ $json.text }}\"\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -432,
+        -176
+      ],
+      "id": "c53b3bbe-8d1a-48cf-a446-70098d119468",
+      "name": "AI Email Classifier1",
+      "credentials": {
+        "openAiApi": {
+          "id": "Ph6V1zE5CppmGRnR",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response and prepare for routing\nconst aiResponse = $input.first().json.response || $input.first().json.text || '';\n\nlet parsedResponse = {};\ntry {\n  // Clean the response and parse JSON\n  const cleanedResponse = aiResponse.replace(/```json|```/g, '').trim();\n  if (cleanedResponse && cleanedResponse !== '{}') {\n    parsedResponse = JSON.parse(cleanedResponse);\n  }\n} catch (error) {\n  console.log('Failed to parse AI response:', error);\n  parsedResponse = {};\n}\n\n// Return the parsed response with routing flags\nreturn [{\n  json: {\n    ...parsedResponse,\n    original_text: $('Has Interview Keyword?2').item.json.text,\n    ai_response: aiResponse,\n    has_interview: parsedResponse.interview === 'present',\n    has_uni_offer: parsedResponse.uni_offer === true\n  }\n}];"
+      },
+      "id": "a92e5613-b177-4efd-8fd2-e1b33c45d3ae",
+      "name": "Parse AI Response1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.has_interview }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    },
+                    "id": "cb06ace8-3313-4ac5-ab9e-136e81ed5a93"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "936db77d-b4cc-4dd4-b8a8-2cd26ff1f6fd",
+                    "leftValue": "={{ $json.has_uni_offer }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -16,
+        -160
+      ],
+      "id": "d0dd037c-fdb9-4eee-b703-33f45a9651b8",
+      "name": "Route Based on Email Type1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ntfy.sh/amra_reminder",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Title",
+              "value": "🎯 AI Interview Alert"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "=Hey Amra! 🎯\n\nAI detected an interview confirmation! 📧\n\nThis was classified by AI as an interview-related email.\n\nGood luck! 💪",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        -192
+      ],
+      "id": "985c7d81-25a8-48a9-a213-9b4a7abe2581",
+      "name": "AI Interview Notification1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "54487cea-2dd9-4c19-96b2-2d54e43d2b4c",
+              "leftValue": "={{ $json.original_text }}",
+              "rightValue": "conditional",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "c2403980-0ba2-420f-a4a8-db9c9dfc8b50",
+              "leftValue": "={{ $json.original_text }}",
+              "rightValue": "Conditional",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        32
+      ],
+      "id": "668a5c63-72c8-4ca6-a6a9-64f47991aec2",
+      "name": "Check Offer Type1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ntfy.sh/amra_reminder",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Title",
+              "value": "🎓 Conditional Offer Alert"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "=Hey Amra! 🎯\n\nCongratulations! You have a CONDITIONAL offer letter from a university! 📧\n\nMake sure to check the conditions carefully! 💪",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        576,
+        -48
+      ],
+      "id": "014aee4a-51f6-4e74-a3a8-d0586a4c159b",
+      "name": "Conditional Offer Notification2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ntfy.sh/amra_reminder",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Title",
+              "value": "🎉 Unconditional Offer Alert"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "=Woohoo, way to go, Amra! 🎉\n\nCongratulations! You have an UNCONDITIONAL offer letter from a university! 🎓\n\nYou're all set! No conditions to meet! 💪✨",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        576,
+        208
+      ],
+      "id": "9ab20b28-bdc2-4d02-b9ec-3de4dda0756c",
+      "name": "Unconditional Offer Notification1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Analyze Email Content": {
+      "main": [
+        [
+          {
+            "node": "Is Job Related?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Job Related?": {
+      "main": [
+        [
+          {
+            "node": "Has Interview Keyword?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Meeting Link?": {
+      "main": [
+        [
+          {
+            "node": "Extract Event Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Interview Keyword?": {
+      "main": [
+        [
+          {
+            "node": "Send Interview Notification2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Email Classifier1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Send Meeting Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a message2": {
+      "main": [
+        [
+          {
+            "node": "Analyze Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Has Meeting Link?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "nadafamra@gmail.com1": {
+      "main": [
+        [
+          {
+            "node": "Get a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "amranadaf3@gmail.com1": {
+      "main": [
+        [
+          {
+            "node": "Get a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "amranadaf@gmail.com1": {
+      "main": [
+        [
+          {
+            "node": "Get a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Event Date & Time": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Email Classifier1": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response1": {
+      "main": [
+        [
+          {
+            "node": "Route Based on Email Type1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Based on Email Type1": {
+      "main": [
+        [
+          {
+            "node": "AI Interview Notification1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Offer Type1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Offer Type1": {
+      "main": [
+        [
+          {
+            "node": "Conditional Offer Notification2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unconditional Offer Notification1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "meta": {
+    "instanceId": "a80e79953156c167ed69035896d54eba7be3bc65f537e2668500b6439839bb45"
+  },
+  "tags": []
+}
